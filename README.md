@@ -1,2 +1,2 @@
-# countdown
+# countdown.sh
 Simple countdown timer
