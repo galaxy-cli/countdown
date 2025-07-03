@@ -3,6 +3,8 @@
 #         / __/ _ \| | | | '_ \| __/ _` |/ _ \ \ /\ / / '_ \  / __| '_ \
 #        | (_| (_) | |_| | | | | || (_| | (_) \ V  V /| | | |_\__ \ | | |
 #         \___\___/ \__,_|_| |_|\__\__,_|\___/ \_/\_/ |_| |_(_)___/_| |_|
+# https://github.com/galaxy-cli/countdown
+# countdown.sh - A simple Bash countdown timer that displays time in minutes and seconds 
 
 # User inputs integer in minutes
 read -p "Countdown (in minutes): " count
