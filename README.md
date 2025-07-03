@@ -1,2 +1,5 @@
 # countdown.sh
-Simple countdown timer
+A simple countdown timer
+
+## USAGE
+Enter integer input in `Countdown (in minutes): `
