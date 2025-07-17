@@ -7,25 +7,214 @@
 # Author: galaxy-cli
 # Project: https://github.com/galaxy-cli/countdown
 
-# User inputs integer in minutes
-read -p "Countdown (in minutes): " count
+trap 'stty echo; echo -e "\nCountdown cancelled"; exit 130' INT
 
-# Checks user input for positive integers
-if ! [[ "$count" =~ ^[0-9]+$ ]] || [ "$count" -le 0 ]; then
-  echo "Please enter a positive integer."
+usage() {
+  cat <<EOF
+USAGE
+  countdown -s SECONDS | -m MM:SS | -h H:MM:SS [-S] [-v]
+OPTIONS
+  -s SECONDS       Countdown in seconds
+  -m MM:SS         Countdown in minutes and seconds (strict two-digit seconds allowed)
+  -h H:MM:SS       Countdown in hours, minutes, and seconds (all two-digit components allowed)
+  -S               Show milliseconds (updates every 0.1s)
+  -v               Show visualizer (e.g. [===     ] 32%%)
+  --help           Show this help message
+EXAMPLES
+  countdown -s 25 -S -v
+  countdown -m 05:30 -v
+  countdown -h 0:01:15 -S
+EOF
+  exit 1
+}
+
+# --- Time parsers ---
+
+parse_minutes() {
+  local input="$1"
+  if [[ "$input" =~ ^([0-9]+):([0-9]{2})$ ]]; then
+    # Strict MM:SS
+    echo "$(( 60 * ${BASH_REMATCH[1]} + ${BASH_REMATCH[2]} ))"
+  elif [[ "$input" =~ ^[0-9]+$ ]]; then
+    # Only MM
+    echo "$(( 60 * input ))"
+  else
+    echo "Error: Invalid -m format. Use MM or MM:SS (two-digit seconds)" >&2
+    exit 1
+  fi
+}
+
+parse_hours() {
+  local input="$1"
+  if [[ "$input" =~ ^([0-9]+):([0-9]{2}):([0-9]{2})$ ]]; then
+    echo "$(( 3600 * ${BASH_REMATCH[1]} + 60 * ${BASH_REMATCH[2]} + ${BASH_REMATCH[3]} ))"
+  elif [[ "$input" =~ ^([0-9]+):([0-9]{2})$ ]]; then
+    echo "$(( 3600 * ${BASH_REMATCH[1]} + 60 * ${BASH_REMATCH[2]} ))"
+  elif [[ "$input" =~ ^[0-9]+$ ]]; then
+    echo "$(( 3600 * input ))"
+  else
+    echo "Error: Invalid -h format. Use H, H:MM, or H:MM:SS with two-digit components" >&2
+    exit 1
+  fi
+}
+
+# --- Output formatter ---
+
+format_time() {
+  local total_time="$1"
+  local mode="$2"
+  local ms="$3"
+
+  if [[ "$mode" == "s" ]]; then
+    # Seconds only, optionally with milliseconds
+    if [[ -z "$ms" ]]; then
+      printf "%d" "$total_time"
+    else
+      printf "%d.%d" "$total_time" "$ms"
+    fi
+  elif [[ "$mode" == "m" ]]; then
+    local mins=$(( total_time / 60 ))
+    local secs=$(( total_time % 60 ))
+    if [[ -z "$ms" ]]; then
+      printf "%02d:%02d" "$mins" "$secs"
+    else
+      printf "%02d:%02d.%d" "$mins" "$secs" "$ms"
+    fi
+  else
+    # h mode: HH:MM:SS or with milliseconds
+    local hrs=$(( total_time / 3600 ))
+    local mins=$(( (total_time % 3600) / 60 ))
+    local secs=$(( total_time % 60 ))
+    if [[ -z "$ms" ]]; then
+      printf "%02d:%02d:%02d" "$hrs" "$mins" "$secs"
+    else
+      printf "%02d:%02d:%02d.%d" "$hrs" "$mins" "$secs" "$ms"
+    fi
+  fi
+}
+
+# --- Visualizer bar function ---
+
+render_bar() {
+  local progress="$1"
+  local width=30
+  local filled=$(( width * progress / 100 ))
+  local empty=$(( width - filled ))
+  local bar="["
+  for ((i=0; i<filled; i++)); do bar+="="; done
+  for ((i=0; i<empty; i++)); do bar+=" "; done
+  bar+="]"
+  printf " %s %3d%%" "$bar" "$progress"
+}
+
+# --- Argument parsing ---
+
+total_seconds=0
+flag_count=0
+show_ms=false
+visualizer=false
+mode=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -s)
+      ((flag_count++))
+      mode="s"
+      shift
+      if [[ -z "${1-}" || ! "$1" =~ ^[0-9]+$ || $1 -le 0 ]]; then
+        echo "Error: -s requires a positive integer" >&2
+        exit 1
+      fi
+      total_seconds=$1
+      ;;
+    -m)
+      ((flag_count++))
+      mode="m"
+      shift
+      if [[ -z "${1-}" ]]; then
+        echo "Error: -m requires MM or MM:SS" >&2
+        exit 1
+      fi
+      total_seconds=$(parse_minutes "$1")
+      ;;
+    -h)
+      ((flag_count++))
+      mode="h"
+      shift
+      if [[ -z "${1-}" ]]; then
+        echo "Error: -h requires H, H:MM, or H:MM:SS" >&2
+        exit 1
+      fi
+      total_seconds=$(parse_hours "$1")
+      ;;
+    -S)
+      show_ms=true
+      ;;
+    -v)
+      visualizer=true
+      ;;
+    --help)
+      usage
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      usage
+      ;;
+  esac
+  shift
+done
+
+if ((flag_count != 1)); then
+  echo "Error: Use exactly one of -s, -m, or -h" >&2
+  usage
+fi
+
+if ((total_seconds <= 0)); then
+  echo "Error: Time must be greater than 0" >&2
   exit 1
 fi
 
-# Calculate total time in seconds
-time=$((60 * count))
+# --- Countdown loop ---
 
-# Countdown timer in 00:00 format
-for ((i=time; i>0; i--)); do
-  mins=$((i / 60))
-  secs=$((i % 60))
-  printf "\r%02d:%02d" "$mins" "$secs"
-  sleep 1
-done
+if $show_ms; then
+  step=0.1
+  total_steps=$(awk "BEGIN { print int($total_seconds / $step) }")
+  remaining_steps=$total_steps
 
-# When timer completes
+  while ((remaining_steps > 0)); do
+    time_left=$(awk "BEGIN { print $remaining_steps * $step }")
+    time_int=$(awk "BEGIN { print int($time_left) }")
+    ms=$(awk "BEGIN { printf \"%d\", ($time_left - int($time_left)) * 10 }")
+
+    output=$(format_time "$time_int" "$mode" "$ms")
+    printf "\r%s" "$output"
+
+    if $visualizer; then
+      percent=$(( 100 * (total_steps - remaining_steps) / total_steps ))
+      render_bar "$percent"
+    fi
+
+    sleep "$step"
+    ((remaining_steps--))
+  done
+else
+  remaining=$total_seconds
+  total=$total_seconds
+  while ((remaining > 0)); do
+    output=$(format_time "$remaining" "$mode")
+
+    printf "\r%s" "$output"
+
+    if $visualizer; then
+      percent=$((100 * (total - remaining) / total))
+      render_bar "$percent"
+    fi
+
+    sleep 1
+    ((remaining--))
+  done
+fi
+
+stty echo
+
 echo -e "\nTime's up!"
