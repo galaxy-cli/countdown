@@ -111,8 +111,3 @@ This project is licensed under the MIT License. See the LICENSE file for details
 **galaxy-cli**
 
 GitHub: [https://github.com/galaxy-cli/countdown](https://github.com/galaxy-cli/countdown)
-
----
-
-Thank you for checking out `countdown`!  
-Happy timing!
