@@ -115,4 +115,4 @@ GitHub: [https://github.com/galaxy-cli/countdown](https://github.com/galaxy-cli/
 ---
 
 Thank you for checking out `countdown`!  
-Happy timing! ⏳
+Happy timing!
