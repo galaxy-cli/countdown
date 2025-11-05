@@ -44,20 +44,21 @@ mv countdown ~/.local/bin/
 
 ## Usage
 
-countdown -s SECONDS [-S] [-v]
-countdown -m MM:SS [-S] [-v]
-countdown -h H:MM:SS [-S] [-v]
+countdown -s SECONDS [-S] [-v] [--alert]
+countdown -m MM:SS [-S] [-v] [--alert]
+countdown -h H:MM:SS [-S] [-v] [--alert]
 countdown --help
 
 
 | Option         | Description                                        |
 |----------------|--------------------------------------------------|
-| `-s SECONDS`   | Countdown in seconds (positive integer)          |
-| `-m MM:SS`     | Countdown in minutes and seconds (strict format) |
-| `-h H:MM:SS`   | Countdown in hours, minutes, and seconds          |
-| `-S`           | Show milliseconds (updates every 0.1 seconds)    |
-| `-v`           | Show visual progress bar                           |
-| `--help`       | Show this help message                             |
+| `-s SECONDS`        | Countdown in seconds (positive integer)          |
+| `-m MM:SS`          | Countdown in minutes and seconds (strict format) |
+| `-h H:MM:SS`        | Countdown in hours, minutes, and seconds          |
+| `-S`                | Show milliseconds (updates every 0.1 seconds)    |
+| `-v`                | Show visual progress bar                           |
+| `--alert MESSAGE`   | Alert message to display (must be quoted if multiple words) |
+| `--help`            | Show this help message                             |
 
 ---
 
