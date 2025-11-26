@@ -157,7 +157,7 @@ while [[ $# -gt 0 ]]; do
     --alert)
       shift
       if [ -z "$1" ]; then
-        echo "ERROR: -a flag requires a message argument"
+        echo "ERROR: --alert flag requires a message argument"
         exit 1
       fi
       use_alert=true
