@@ -1,239 +1,132 @@
 #!/bin/bash
-#          ___ ___  _   _ _ __ | |_ __| | _____      ___ __
-#         / __/ _ \| | | | '_ \| __/ _` |/ _ \ \ /\ / / '_ \
-#        | (_| (_) | |_| | | | | || (_| | (_) \ V  V /| | | |
-#         \___\___/ \__,_|_| |_|\__\__,_|\___/ \_/\_/ |_| |_|
+#
+#   ___ ___  _   _ _ __ | |_ __| | _____      ___ __
+#  / __/ _ \| | | | '_ \| __/ _` |/ _ \ \ /\ / / '_ \
+# | (_| (_) | |_| | | | | || (_| | (_) \ V  V /| | | |
+#  \___\___/ \__,_|_| |_|\__\__,_|\___/ \_/\_/ |_| |_|
+#
 # countdown.sh - A simple Bash countdown timer that displays time in minutes and seconds
-# Author: galaxy-cli
+#
 # Project: https://github.com/galaxy-cli/countdown
 
-trap 'stty echo; echo -e "\nCountdown cancelled"; exit 130' INT
+# Clean up terminal settings on exit
+trap 'stty echo; echo -e "\ncountdown: Countdown cancelled"; exit 130' INT
 
-usage() {
-  cat <<EOF
-USAGE
-  countdown -s SECONDS | -m MM:SS | -h H:MM:SS [-S] [-v]
-OPTIONS
-  -s SECONDS       Countdown in seconds
-  -m MM:SS         Countdown in minutes and seconds (strict two-digit seconds allowed)
-  -h H:MM:SS       Countdown in hours, minutes, and seconds (all two-digit components allowed)
-  -S               Show milliseconds (updates every 0.1s)
-  -v               Show visualizer (e.g. [===     ] 32%%)
-  --alert MESSAGE  Alert message to display (must be quoted if multiple words)
-  --help           Show this help message
-EXAMPLES
-  countdown -s 25 -a "Time's up!" -S -v
-  countdown -m 05:30
-  countdown -h 0:01:15 -S
-EOF
+# Check if pv is installed
+if ! command -v pv >/dev/null 2>&1; then
+  echo "countdown: This script requires 'pv'. Install it with: sudo apt install pv" >&2
+  exit 1
+fi
+
+# Help hint for errors
+try_help() {
+  echo "Try 'countdown --help' for more information." >&2
   exit 1
 }
 
-use_alert=false
+usage() {
+  cat <<EOF
+DESCRIPTION
+  A simplified, high-precision CLI timer using 'pv' for the progress bar.
 
-# --- Time parsers ---
+USAGE
+  countdown [OPTION]
 
+OPTION
+  -s SECONDS       Countdown in seconds
+  -m MM:SS         Countdown in minutes and seconds
+  -h H:MM:SS       Countdown in hours, minutes, and seconds
+  --alert MESSAGE  Alert message to display via system notification
+  --help           Show this help message
+
+EXAMPLES
+  countdown -m 05:00
+  countdown -s 30 --alert "Check the oven!"
+EOF
+  exit 0
+}
+
+# --- TIME PARSERS ---
 parse_minutes() {
   local input="$1"
-  if [[ "$input" =~ ^([0-9]+):([0-9]{2})$ ]]; then
-    # Strict MM:SS
-    echo "$(( 60 * ${BASH_REMATCH[1]} + ${BASH_REMATCH[2]} ))"
+  if [[ "$input" =~ ^([0-9]+):([0-9]{1,2})$ ]]; then
+    echo "$(( 60 * 10#${BASH_REMATCH[1]} + 10#${BASH_REMATCH[2]} ))"
   elif [[ "$input" =~ ^[0-9]+$ ]]; then
-    # Only MM
-    echo "$(( 60 * input ))"
+    echo "$(( 60 * 10#$input ))"
   else
-    echo "ERROR: Invalid -m format. Use MM or MM:SS (two-digit seconds)" >&2
-    exit 1
+    echo "countdown: Invalid -m format -- '$input'" >&2
+    try_help
   fi
 }
 
 parse_hours() {
   local input="$1"
-  if [[ "$input" =~ ^([0-9]+):([0-9]{2}):([0-9]{2})$ ]]; then
-    echo "$(( 3600 * ${BASH_REMATCH[1]} + 60 * ${BASH_REMATCH[2]} + ${BASH_REMATCH[3]} ))"
-  elif [[ "$input" =~ ^([0-9]+):([0-9]{2})$ ]]; then
-    echo "$(( 3600 * ${BASH_REMATCH[1]} + 60 * ${BASH_REMATCH[2]} ))"
+  if [[ "$input" =~ ^([0-9]+):([0-9]{1,2}):([0-9]{1,2})$ ]]; then
+    echo "$(( 3600 * 10#${BASH_REMATCH[1]} + 60 * 10#${BASH_REMATCH[2]} + 10#${BASH_REMATCH[3]} ))"
+  elif [[ "$input" =~ ^([0-9]+):([0-9]{1,2})$ ]]; then
+    echo "$(( 3600 * 10#${BASH_REMATCH[1]} + 60 * 10#${BASH_REMATCH[2]} ))"
   elif [[ "$input" =~ ^[0-9]+$ ]]; then
-    echo "$(( 3600 * input ))"
+    echo "$(( 3600 * 10#$input ))"
   else
-    echo "ERROR: Invalid -h format. Use H, H:MM, or H:MM:SS with two-digit components" >&2
-    exit 1
+    echo "countdown: Invalid -h format -- '$input'" >&2
+    try_help
   fi
 }
 
-# --- Output formatter ---
-
-format_time() {
-  local total_time="$1"
-  local mode="$2"
-  local ms="$3"
-
-  if [[ "$mode" == "s" ]]; then
-    # Seconds only, optionally with milliseconds
-    if [[ -z "$ms" ]]; then
-      printf "%d" "$total_time"
-    else
-      printf "%d.%d" "$total_time" "$ms"
-    fi
-  elif [[ "$mode" == "m" ]]; then
-    local mins=$(( total_time / 60 ))
-    local secs=$(( total_time % 60 ))
-    if [[ -z "$ms" ]]; then
-      printf "%02d:%02d" "$mins" "$secs"
-    else
-      printf "%02d:%02d.%d" "$mins" "$secs" "$ms"
-    fi
-  else
-    # h mode: HH:MM:SS or with milliseconds
-    local hrs=$(( total_time / 3600 ))
-    local mins=$(( (total_time % 3600) / 60 ))
-    local secs=$(( total_time % 60 ))
-    if [[ -z "$ms" ]]; then
-      printf "%02d:%02d:%02d" "$hrs" "$mins" "$secs"
-    else
-      printf "%02d:%02d:%02d.%d" "$hrs" "$mins" "$secs" "$ms"
-    fi
-  fi
-}
-
-# --- Visualizer bar function ---
-
-render_bar() {
-  local progress="$1"
-  local width=30
-  local filled=$(( width * progress / 100 ))
-  local empty=$(( width - filled ))
-  local bar="["
-  for ((i=0; i<filled; i++)); do bar+="="; done
-  for ((i=0; i<empty; i++)); do bar+=" "; done
-  bar+="]"
-  printf " %s %3d%%" "$bar" "$progress"
-}
-
-# --- Argument parsing ---
-
+# --- ARGUMENT PARSING ---
 total_seconds=0
 alert_message="Time's up!"
+use_alert=false
 flag_count=0
-show_ms=false
-visualizer=false
-mode=""
+
+[[ $# -eq 0 ]] && try_help
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -s)
-      ((flag_count++))
-      mode="s"
+    -s) 
+      ((flag_count++)); shift
+      [[ -z "$1" || ! "$1" =~ ^[0-9]+$ ]] && { echo "countdown: Option requires a positive integer -- 's'" >&2; try_help; }
+      total_seconds=$1 
+      ;;
+    -m) 
+      ((flag_count++)); shift
+      [[ -z "$1" ]] && { echo "countdown: Option requires an argument -- 'm'" >&2; try_help; }
+      total_seconds=$(parse_minutes "$1") 
+      ;;
+    -h) 
+      ((flag_count++)); shift
+      [[ -z "$1" ]] && { echo "countdown: Option requires an argument -- 'h'" >&2; try_help; }
+      total_seconds=$(parse_hours "$1") 
+      ;;
+    --alert) 
       shift
-      if [[ -z "${1-}" || ! "$1" =~ ^[0-9]+$ || $1 -le 0 ]]; then
-        echo "ERROR: -s requires a positive integer" >&2
-        exit 1
-      fi
-      total_seconds=$1
+      [[ -z "$1" ]] && { echo "countdown: Option requires an argument -- 'alert'" >&2; try_help; }
+      use_alert=true; alert_message="$1" 
       ;;
-    -m)
-      ((flag_count++))
-      mode="m"
-      shift
-      if [[ -z "${1-}" ]]; then
-        echo "ERROR: -m requires MM or MM:SS" >&2
-        exit 1
-      fi
-      total_seconds=$(parse_minutes "$1")
+    --help) 
+      usage 
       ;;
-    -h)
-      ((flag_count++))
-      mode="h"
-      shift
-      if [[ -z "${1-}" ]]; then
-        echo "ERROR: -h requires H, H:MM, or H:MM:SS" >&2
-        exit 1
-      fi
-      total_seconds=$(parse_hours "$1")
-      ;;
-    -S)
-      show_ms=true
-      ;;
-    --alert)
-      shift
-      if [ -z "$1" ]; then
-        echo "ERROR: --alert flag requires a message argument"
-        exit 1
-      fi
-      use_alert=true
-      alert_message="$1"
-      ;;
-    -v)
-      visualizer=true
-      ;;
-    --help)
-      usage
-      ;;
-    *)
-      echo "Unknown option: $1" >&2
-      usage
+    *) 
+      echo "countdown: Unrecognized option '$1'" >&2
+      try_help
       ;;
   esac
   shift
 done
 
-if ((flag_count != 1)); then
-  usage
+if [[ $flag_count -ne 1 || $total_seconds -le 0 ]]; then
+  [[ $flag_count -gt 1 ]] && echo "countdown: Please use only one time option (-s, -m, or -h)" >&2
+  try_help
 fi
 
-if ((total_seconds <= 0)); then
-  echo "ERROR: Time must be greater than 0" >&2
-  exit 1
-fi
+# --- COUNTDOWN EXECUTION ---
+printf "Countdown started: %d seconds\n" "$total_seconds"
+yes | head -c "$total_seconds" | pv -p -t -e -L 1 -s "$total_seconds" > /dev/null
 
-# --- Countdown loop ---
-
-if $show_ms; then
-  step=0.1
-  total_steps=$(awk "BEGIN { print int($total_seconds / $step) }")
-  remaining_steps=$total_steps
-
-  while ((remaining_steps > 0)); do
-    time_left=$(awk "BEGIN { print $remaining_steps * $step }")
-    time_int=$(awk "BEGIN { print int($time_left) }")
-    ms=$(awk "BEGIN { printf \"%d\", ($time_left - int($time_left)) * 10 }")
-
-    output=$(format_time "$time_int" "$mode" "$ms")
-    printf "\r%s" "$output"
-
-    if $visualizer; then
-      percent=$(( 100 * (total_steps - remaining_steps) / total_steps ))
-      render_bar "$percent"
-    fi
-
-    sleep "$step"
-    ((remaining_steps--))
-  done
-else
-  remaining=$total_seconds
-  total=$total_seconds
-  while ((remaining > 0)); do
-    output=$(format_time "$remaining" "$mode")
-
-    printf "\r%s" "$output"
-
-    if $visualizer; then
-      percent=$((100 * (total - remaining) / total))
-      render_bar "$percent"
-    fi
-
-    sleep 1
-    ((remaining--))
-  done
-fi
-
-stty echo
-
+# --- COMPLETION ---
 if $use_alert; then
-  export DISPLAY=:0
-  export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u)/bus"
-  notify-send --urgency=low -i terminal "countdown" "$alert_message"
+  command -v notify-send >/dev/null 2>&1 && notify-send "countdown" "$alert_message"
+  echo -e "\ncountdown: $alert_message"
 else
-  echo -e "\nTime's up!"
+  echo -e "\ncountdown: Time's up!"
 fi
-
