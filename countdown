@@ -14,13 +14,13 @@ trap 'stty echo; echo -e "\ncountdown: Countdown cancelled"; exit 130' INT
 
 # Check if pv is installed
 if ! command -v pv >/dev/null 2>&1; then
-  echo "countdown: This script requires 'pv'. Install it with: sudo apt install pv" >&2
+  echo "This script requires 'pv'. Install it with: sudo apt install pv" >&2
   exit 1
 fi
 
 # Help hint for errors
 try_help() {
-  echo "Try 'countdown --help' for more information." >&2
+  echo "Try 'countdown --help' for more information" >&2
   exit 1
 }
 
@@ -54,7 +54,7 @@ parse_minutes() {
   elif [[ "$input" =~ ^[0-9]+$ ]]; then
     echo "$(( 60 * 10#$input ))"
   else
-    echo "countdown: Invalid -m format -- '$input'" >&2
+    echo "ERROR - Invalid -m format -- '$input'" >&2
     try_help
   fi
 }
@@ -68,7 +68,7 @@ parse_hours() {
   elif [[ "$input" =~ ^[0-9]+$ ]]; then
     echo "$(( 3600 * 10#$input ))"
   else
-    echo "countdown: Invalid -h format -- '$input'" >&2
+    echo "ERROR - Invalid -h format -- '$input'" >&2
     try_help
   fi
 }
@@ -85,29 +85,29 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     -s) 
       ((flag_count++)); shift
-      [[ -z "$1" || ! "$1" =~ ^[0-9]+$ ]] && { echo "countdown: Option requires a positive integer -- 's'" >&2; try_help; }
+      [[ -z "$1" || ! "$1" =~ ^[0-9]+$ ]] && { echo "ERORR - Option requires a positive integer -- 's'" >&2; try_help; }
       total_seconds=$1 
       ;;
     -m) 
       ((flag_count++)); shift
-      [[ -z "$1" ]] && { echo "countdown: Option requires an argument -- 'm'" >&2; try_help; }
+      [[ -z "$1" ]] && { echo "ERROR - Option requires an argument -- 'm'" >&2; try_help; }
       total_seconds=$(parse_minutes "$1") 
       ;;
     -h) 
       ((flag_count++)); shift
-      [[ -z "$1" ]] && { echo "countdown: Option requires an argument -- 'h'" >&2; try_help; }
+      [[ -z "$1" ]] && { echo "ERROR - Option requires an argument -- 'h'" >&2; try_help; }
       total_seconds=$(parse_hours "$1") 
       ;;
     --alert) 
       shift
-      [[ -z "$1" ]] && { echo "countdown: Option requires an argument -- 'alert'" >&2; try_help; }
+      [[ -z "$1" ]] && { echo "ERROR - Option requires an argument -- 'alert'" >&2; try_help; }
       use_alert=true; alert_message="$1" 
       ;;
     --help) 
       usage 
       ;;
     *) 
-      echo "countdown: Unrecognized option '$1'" >&2
+      echo "Unrecognized option '$1'" >&2
       try_help
       ;;
   esac
@@ -115,7 +115,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ $flag_count -ne 1 || $total_seconds -le 0 ]]; then
-  [[ $flag_count -gt 1 ]] && echo "countdown: Please use only one time option (-s, -m, or -h)" >&2
+  [[ $flag_count -gt 1 ]] && echo "ERROR - Please use only one time option (-s, -m, or -h)" >&2
   try_help
 fi
 
@@ -126,7 +126,7 @@ yes | head -c "$total_seconds" | pv -p -t -e -L 1 -s "$total_seconds" > /dev/nul
 # --- COMPLETION ---
 if $use_alert; then
   command -v notify-send >/dev/null 2>&1 && notify-send "countdown" "$alert_message"
-  echo -e "\ncountdown: $alert_message"
+  echo -e "\n$alert_message"
 else
-  echo -e "\ncountdown: Time's up!"
+  echo -e "\nTime's up!"
 fi
