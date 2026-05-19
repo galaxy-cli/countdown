@@ -1,0 +1,157 @@
+#!/bin/bash
+#            _ _   
+#     ___ __| | |_ 
+#    / __/ _` | __|
+#   | (_| (_| | |_ 
+#    \___\__,_|\__|
+#               
+# cdt - A high-precision, drift-corrected CLI timer using pv
+#
+# Project: https://github.com
+
+# --- PROGRAM CONFIGURATION ---
+PROGRAM_NAME="${0##*/}"
+VERSION="1.1.0"
+
+# --- SYSTEM DEPENDENCY RUNTIME CHECK ---
+if ! command -v pv >/dev/null 2>&1; then
+  echo "${PROGRAM_NAME}: missing required command dependency: 'pv'" >&2
+  echo "Please install it via your package manager: sudo apt install pv" >&2
+  exit 1
+fi
+
+# --- USAGE ---
+usage() {
+  cat <<EOF
+Usage: ${PROGRAM_NAME} [OPTION]...
+
+A high-precision, drift-corrected CLI timer using pv for the progress bar.
+
+Mandatory arguments to long options are mandatory for short options too.
+  -s, --seconds=NUM      countdown in raw NUM seconds
+  -m, --minutes=MM:SS    countdown in minutes and seconds
+  -h, --hours=H:MM:SS    countdown in hours, minutes, and seconds
+      --help             display this help and exit
+  -v, --version          output version information and exit
+
+Examples:
+  ${PROGRAM_NAME} -m 05:00
+  ${PROGRAM_NAME} -s 30
+
+Report bugs to: <207926666+galaxy-cli@://github.com>
+EOF
+}
+
+# --- VERSION ---
+show_version() {
+    cat <<EOF
+${PROGRAM_NAME} ${VERSION}
+EOF
+}
+
+# --- TIME FORMAT INTERPRETERS ---
+parse_minutes() {
+  local input="$1"
+  if [[ "$input" =~ ^([0-9]+):([0-9]{1,2})$ ]]; then
+    echo "$(( 60 * 10#${BASH_REMATCH[1]} + 10#${BASH_REMATCH[2]} ))"
+  elif [[ "$input" =~ ^[0-9]+$ ]]; then
+    echo "$(( 60 * 10#$input ))"
+  else
+    echo "${PROGRAM_NAME}: invalid --minutes format -- '$input'" >&2
+    echo "Try '${PROGRAM_NAME} --help' for more information" >&2
+    exit 1
+  fi
+}
+
+parse_hours() {
+  local input="$1"
+  if [[ "$input" =~ ^([0-9]+):([0-9]{1,2}):([0-9]{1,2})$ ]]; then
+    echo "$(( 3600 * 10#${BASH_REMATCH[1]} + 60 * 10#${BASH_REMATCH[2]} + 10#${BASH_REMATCH[3]} ))"
+  elif [[ "$input" =~ ^([0-9]+):([0-9]{1,2})$ ]]; then
+    echo "$(( 3600 * 10#${BASH_REMATCH[1]} + 60 * 10#${BASH_REMATCH[2]} ))"
+  elif [[ "$input" =~ ^[0-9]+$ ]]; then
+    echo "$(( 3600 * 10#$input ))"
+  else
+    echo "${PROGRAM_NAME}: invalid --hours format -- '$input'" >&2
+    echo "Try '${PROGRAM_NAME} --help' for more information" >&2
+    exit 1
+  fi
+}
+
+# --- INITIALIZE VARIABLES ---
+total_seconds=0
+time_flag_count=0
+
+# --- ARGUMENT PARSING ---
+if [[ $# -eq 0 ]]; then
+    echo "${PROGRAM_NAME}: missing operand timer configuration" >&2
+    echo "Try '${PROGRAM_NAME} --help' for more information" >&2
+    exit 1
+fi
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -s|--seconds) 
+      ((time_flag_count++))
+      [[ -z "$2" || ! "$2" =~ ^[0-9]+$ ]] && { echo "${PROGRAM_NAME}: option requires a positive integer argument -- 's'" >&2; exit 1; }
+      total_seconds="$2" 
+      shift 2
+      ;;
+    -m|--minutes) 
+      ((time_flag_count++))
+      [[ -z "$2" ]] && { echo "${PROGRAM_NAME}: option requires an argument -- 'm'" >&2; exit 1; }
+      total_seconds=$(parse_minutes "$2") 
+      shift 2
+      ;;
+    -h|--hours) 
+      ((time_flag_count++))
+      [[ -z "$2" ]] && { echo "${PROGRAM_NAME}: option requires an argument -- 'h'" >&2; exit 1; }
+      total_seconds=$(parse_hours "$2") 
+      shift 2
+      ;;
+    --help) 
+      usage
+      exit 0
+      ;;
+    -v|--version)
+      show_version
+      exit 0
+      ;;
+    -*)
+      echo "${PROGRAM_NAME}: unrecognized option '$1'" >&2
+      echo "Try '${PROGRAM_NAME} --help' for more information" >&2
+      exit 1
+      ;;
+    *) 
+      echo "${PROGRAM_NAME}: extra operand '$1'" >&2
+      echo "Try '${PROGRAM_NAME} --help' for more information" >&2
+      exit 1
+      ;;
+  esac
+done
+
+# --- OPERATIONAL CONSTRAINT CHECKS ---
+if (( time_flag_count != 1 )) || (( total_seconds <= 0 )); then
+  if (( time_flag_count > 1 )); then
+    echo "${PROGRAM_NAME}: multiple time configurations specified -- choose only one (-s, -m, or -h)" >&2
+  else
+    echo "${PROGRAM_NAME}: invalid or missing countdown duration configuration" >&2
+  fi
+  echo "Try '${PROGRAM_NAME} --help' for more information" >&2
+  exit 1
+fi
+
+# --- TIMER CLEAN DISPOSAL TRAP ---
+cleanup() {
+    pkill -P $$ head pv 2>/dev/null
+    echo -e "\n${PROGRAM_NAME}: timer cancelled"
+}
+trap 'cleanup; exit 130' SIGINT SIGTERM
+
+# --- HIGH-PRECISION TIMER RUNTIME ---
+printf "${PROGRAM_NAME}: countdown started for %d seconds\n" "$total_seconds"
+
+# Displays the minimal stopwatch prefix layout matching your formatting standards
+yes | head -c "$total_seconds" | pv -F "%N: %t %p" -p -t -e -L 1 -s "$total_seconds" -N "Timer" > /dev/null
+
+echo "" # Final formatting line break on success

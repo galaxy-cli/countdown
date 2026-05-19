@@ -1,47 +1,41 @@
-# Countdown
+# cdt
 
-A high-precision, drift-corrected CLI timer for Linux. This tool uses `pv` (Pipe Viewer) to provide a smooth, flicker-free progress bar and maintains perfect accuracy by rate-limiting a byte stream.
+A minimalist, high-precision CLI countdown timer that leverages `pv` to provide a clean, drift-corrected terminal stopwatch.
 
-## Features
-- **High Precision**: Uses byte-stream rate limiting for sub-second accuracy.
-- **Flexible Input**: Supports seconds, `MM:SS`, or `H:MM:SS` formats.
-- **System Notifications**: Optional desktop alerts via `notify-send`.
-- **Clean UI**: A smooth progress bar that automatically adjusts to terminal width.
+### Prerequisites
 
-## Prerequisites
-This script requires `pv` (Pipe Viewer). You can install it via your package manager:
+- **pv** (Pipe Viewer): The underlying visual tracking engine
 
-`sudo apt install pv`
-
-## Installation
-
-1. Save the script as countdown.Make it executable:
-`chmod +x countdown`
-
-2. (Optional) Move it to your path to run it from anywhere:
-`sudo mv countdown /usr/local/bin/`
-
-## Usage
-`countdown [OPTION]`
-
-## Options
-
-| Option | Description |
-| :--- | :--- |
-| `-s SECONDS` | Countdown in seconds |
-| `-m MM:SS` | Countdown in minutes and seconds |
-| `-h H:MM:SS` | Countdown in hours, minutes, and seconds |
-| `--alert "MSG"` | Display a system notification when finished |
-| `--help` | Show the help message |
-
-## Examples
+You can install this dependency on Debian/Ubuntu systems via:
+```bash
+sudo apt update && sudo apt install pv
 ```
-# 90-second timer
-countdown -s 90
 
-# 5-minute timer
-countdown -m 05:00
+### Installation
 
-# 1-hour timer with a desktop alert
-countdown -h 1:00:00 --alert "Meeting starting now!"
+Give the script execution permissions and move it into your local binary directory:
+
+```bash
+chmod +x cdt
+mv cdt ~/.local/bin/          # Or anywhere else in your $PATH
 ```
+
+### Usage
+
+```bash
+cdt -s 30                # Raw mode: countdown for 30 seconds
+cdt -m 05:00             # Minute mode: countdown for 5 minutes
+cdt -h 1:30:00           # Hour mode: countdown for 1 hour and 30 minutes
+```
+
+### Options
+
+
+
+| Option | Argument | Description |
+| :--- | :---: | :--- |
+| `-s, --seconds`   | `NUM` | countdown duration in raw NUM seconds |
+| `-m, --minutes`   | `MM:SS`| countdown duration in minutes and seconds |
+| `-h, --hours`     | `H:MM:SS`| countdown duration in hours, minutes, and seconds |
+| `--help`          | None | Show help message and exit |
+| `-v, --version`   | None | Output version information and exit |
