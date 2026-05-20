@@ -1,4 +1,4 @@
-# cdt
+# countd
 
 A minimalist, high-precision CLI countdown timer that leverages `pv` to provide a clean, drift-corrected terminal stopwatch.
 
@@ -16,16 +16,16 @@ sudo apt update && sudo apt install pv
 Give the script execution permissions and move it into your local binary directory:
 
 ```bash
-chmod +x cdt
-mv cdt ~/.local/bin/          # Or anywhere else in your $PATH
+chmod +x countd
+mv countd ~/.local/bin/          # Or anywhere else in your $PATH
 ```
 
 ### Usage
 
 ```bash
-cdt -s 30                # Raw mode: countdown for 30 seconds
-cdt -m 05:00             # Minute mode: countdown for 5 minutes
-cdt -h 1:30:00           # Hour mode: countdown for 1 hour and 30 minutes
+countd -s 30                # Raw mode: countdown for 30 seconds
+countd -m 05:00             # Minute mode: countdown for 5 minutes
+countd -h 1:30:00           # Hour mode: countdown for 1 hour and 30 minutes
 ```
 
 ### Options
